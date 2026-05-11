@@ -21,9 +21,17 @@ class BKAModule(BaseModule):
             else:
                 rss_url += "?view=renderRSS"
 
-        feed = feedparser.parse(rss_url)
-        jobs = []
+        # Optimierung: Erst mit requests holen (schnellerer Timeout & Handling)
+        try:
+            import requests
+            response = requests.get(rss_url, timeout=10)
+            response.raise_for_status()
+            feed = feedparser.parse(response.content)
+        except Exception as e:
+            print(f"Fehler beim Laden des BKA-Feeds: {e}")
+            return []
 
+        jobs = []
         for entry in feed.entries:
             # ID aus dem Link extrahieren (z.B. .../T-2026-31.html -> T-2026-31)
             job_id = entry.link.split('/')[-1].replace('.html', '')

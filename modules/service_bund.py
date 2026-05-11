@@ -24,9 +24,17 @@ class ServiceBundModule(BaseModule):
         if "resultsPerPage=" not in rss_url:
              rss_url += "&resultsPerPage=100"
 
-        feed = feedparser.parse(rss_url)
-        jobs = []
+        # Optimierung: Erst mit requests holen
+        try:
+            import requests
+            response = requests.get(rss_url, timeout=10)
+            response.raise_for_status()
+            feed = feedparser.parse(response.content)
+        except Exception as e:
+            print(f"Fehler beim Laden des ServiceBund-Feeds: {e}")
+            return []
 
+        jobs = []
         for entry in feed.entries:
             jobs.append({
                 'id': entry.id if hasattr(entry, 'id') else entry.link,
