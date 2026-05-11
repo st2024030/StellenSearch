@@ -30,9 +30,9 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SERVICE_BUND_SEARCH_URL: ${{ secrets.SERVICE_BUND_SEARCH_URL }}
-          BUNDESPOLIZEI_SEARCH_URL: ${{ secrets.BUNDESPOLIZEI_SEARCH_URL }}
-          BKA_SEARCH_URL: ${{ secrets.BKA_SEARCH_URL }}
+          SERVICE_BUND_SEARCH_URL: "https://www.service.bund.de/Content/DE/Stellen/Suche/Formular.html?cl2Categories_Taetigkeitsfeld=taetigkeitsfeld-itundtelekommunikation&cl2Categories_Laufbahn=laufbahn-hoehererdienst&cl2Addresses_Adresse_State=berlin&nn=4642046&resourceId=4642034&input_=4642046&pageLocale=de&type=0&templateQueryString=&city_zipcode=Berlin&solr_opengeo_id=14356&solr_opengeo_id.HASH=c001abK95sDlc2QqNXldTa8YY9yitdU%3D&ambit_distance=30&submit=Finden&emailText=&gts=4642266_list%3DdateOfIssue_dt%2Bdesc&resultsPerPage=100"
+          BUNDESPOLIZEI_SEARCH_URL: "https://www.komm-zur-bundespolizei.de/verstaerkung/stellenmarkt?specialism_id[0]=21&location_id[0]=579&qualification_id[0]=129"
+          BKA_SEARCH_URL: "https://www.karriere.bka.de/SiteGlobals/Forms/Suche/Karriereportal/Stellenangebote_Formular.html?nn=186626&karriere_joboffer_locationtitle=berlin&cl2Categories_Berufsgruppe=it_und_technik"
         run: python main.py
 
       - name: Änderungen speichern (Persistence)
