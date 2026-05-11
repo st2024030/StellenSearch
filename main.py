@@ -36,23 +36,32 @@ def run(loop=False):
     print(f"Robot gestartet mit {len(active_modules)} Modulen: {[m.name for m in active_modules]}")
 
     while True:
+        start_run = time.time()
         all_new_jobs = []
         for module in active_modules:
-            print(f"Suche auf {module.name}...")
+            print(f"Suche auf {module.name}...", end=" ", flush=True)
+            module_start = time.time()
             try:
                 jobs = module.fetch_jobs()
+                duration = time.time() - module_start
+                print(f"erledigt ({len(jobs)} Jobs gefunden in {duration:.2f}s)")
+                
                 for job in jobs:
                     if not db.job_exists(job['id']):
-                        print(f"Neuer Job gefunden: {job['title']}")
+                        print(f"  -> Neuer Job: {job['title']}")
                         db.add_job(job['id'], module.name, job['title'], job['url'])
                         all_new_jobs.append((module.name, job))
             except Exception as e:
-                print(f"Fehler im Modul {module.name}: {e}")
+                print(f"FEHLER: {e}")
 
         if all_new_jobs:
+            print(f"Sende {len(all_new_jobs)} neue Jobs an Telegram...")
             notifier.notify_jobs_bundled(all_new_jobs)
         else:
             print("Keine neuen Jobs gefunden.")
+
+        total_duration = time.time() - start_run
+        print(f"Durchlauf beendet. Gesamtdauer: {total_duration:.2f}s")
 
         if not loop:
             break
