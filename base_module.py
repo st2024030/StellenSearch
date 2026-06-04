@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import re
 import requests
 import feedparser
 
@@ -63,3 +64,36 @@ class BaseModule(ABC):
             return url
         separator = '&' if '?' in url else '?'
         return f"{url}{separator}{param}"
+
+    @staticmethod
+    def matches_filters(title, location="", keywords=None, locations=None):
+        """
+        Clientseitiger Filter für Quellen ohne serverseitige Filterung.
+
+        keywords:  mind. eines muss im Titel vorkommen (z.B. höherer Dienst / IT).
+        locations: mind. eines muss in Titel oder Ort vorkommen (z.B. berlin).
+        Leere/None-Listen bedeuten "kein Filter" für das jeweilige Kriterium.
+        """
+        title_l = (title or "").lower()
+        haystack = f"{title_l} {(location or '').lower()}"
+
+        if keywords:
+            if not any(kw in title_l for kw in keywords):
+                return False
+        if locations:
+            if not any(loc in haystack for loc in locations):
+                return False
+        return True
+
+
+# (m/w/d), (w/m/d), (m/w/d/i), m/w/d usw. inkl. umschließender Klammern entfernen
+_GENDER_RE = re.compile(r"\(?\s*[mwd](?:\s*/\s*[mwdi]){1,3}\s*\)?", re.IGNORECASE)
+_NONWORD_RE = re.compile(r"[^a-z0-9äöüß]+")
+
+
+def normalize_for_dedup(title, location=""):
+    """Normalisiert Titel (+optional Ort) zu einem quellenübergreifenden Dedup-Schlüssel."""
+    text = f"{title or ''} {location or ''}".lower()
+    text = _GENDER_RE.sub(" ", text)
+    text = _NONWORD_RE.sub(" ", text)
+    return " ".join(text.split())

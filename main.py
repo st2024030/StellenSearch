@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from config import validate_config, CHECK_INTERVAL_MINUTES
 from database import Database
 from notifier import Notifier
-from base_module import BaseModule
+from base_module import BaseModule, normalize_for_dedup
 import modules
 
 def load_modules():
@@ -63,14 +63,17 @@ def run(loop=False):
 
                 label = f"erledigt ({len(jobs)} Jobs gefunden in {duration:.2f}s)"
                 if not jobs:
-                    label += "  ⚠️  0 Jobs – evtl. Filter/Selektor prüfen"
+                    label += "  [!] 0 Jobs - evtl. Filter/Selektor pruefen"
                 print(f"Suche auf {module.name}... {label}")
 
                 for job in jobs:
-                    if not db.job_exists(job['id']):
-                        print(f"  -> Neuer Job: {job['title']}")
-                        db.add_job(job['id'], module.name, job['title'], job['url'])
-                        all_new_jobs.append((module.name, job))
+                    dedup_key = normalize_for_dedup(job['title'], job.get('location', ''))
+                    # Bekannt, wenn die Quellen-ID ODER (quellenübergreifend) der Titel schon existiert
+                    if db.job_exists(job['id']) or db.dedup_key_exists(dedup_key):
+                        continue
+                    print(f"  -> Neuer Job: {job['title']}")
+                    db.add_job(job['id'], module.name, job['title'], job['url'], dedup_key)
+                    all_new_jobs.append((module.name, job))
 
             if all_new_jobs:
                 print(f"Sende {len(all_new_jobs)} neue Jobs an Telegram...")

@@ -44,10 +44,14 @@ class Notifier:
                 grouped_jobs[portal] = []
             grouped_jobs[portal].append(job)
 
+        # Reihenfolge: Bund-Quellen zuerst, "Land Berlin" als Zusatz zuletzt
+        ordered_portals = sorted(grouped_jobs, key=lambda p: (p == "Land Berlin", p))
+
         header = f"🔔 <b>{len(new_jobs)} neue Stellen gefunden!</b>\n\n"
         message = header
-        
-        for portal, jobs in grouped_jobs.items():
+
+        for portal in ordered_portals:
+            jobs = grouped_jobs[portal]
             portal_section = f"<b>🏢 {portal}</b>\n" + "─" * 15 + "\n"
             
             if len(message) + len(portal_section) > 4000:
