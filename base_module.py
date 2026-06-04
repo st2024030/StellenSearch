@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import re
+import time
 import requests
 import feedparser
 
@@ -44,12 +45,21 @@ class BaseModule(ABC):
 
     # --- Gemeinsame Helfer für die Module ---
 
-    def get(self, url, **kwargs):
-        """GET-Request über die geteilte Session inkl. Timeout & raise_for_status."""
+    def get(self, url, retries=2, **kwargs):
+        """
+        GET-Request über die geteilte Session inkl. Timeout & raise_for_status.
+        Bei transienten Netzwerkfehlern (Connection-Reset, Timeout) wird erneut versucht.
+        """
         kwargs.setdefault('timeout', self.DEFAULT_TIMEOUT)
-        response = self.session.get(url, **kwargs)
-        response.raise_for_status()
-        return response
+        for attempt in range(retries + 1):
+            try:
+                response = self.session.get(url, **kwargs)
+                response.raise_for_status()
+                return response
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                if attempt >= retries:
+                    raise
+                time.sleep(1.5 * (attempt + 1))
 
     def fetch_rss(self, url):
         """Lädt eine URL und parst sie als RSS/Atom-Feed."""
@@ -97,3 +107,20 @@ def normalize_for_dedup(title, location=""):
     text = _GENDER_RE.sub(" ", text)
     text = _NONWORD_RE.sub(" ", text)
     return " ".join(text.split())
+
+
+# Behörden-Kennziffern wie AS-2026-072, AWV-2026-029, THW-2026-130, T-2026-29, UKRat-2026-008
+_KENNZIFFER_RE = re.compile(r"\b([A-Za-z]{1,6}-\d{4}-\d{1,4})\b")
+
+
+def extract_kennziffer(*texts):
+    """
+    Extrahiert eine Behörden-Kennziffer aus Titel/URL (falls vorhanden).
+    Solche Kennziffern erscheinen oft in mehreren Quellen und eignen sich daher
+    als robuster quellenübergreifender Dedup-Schlüssel.
+    """
+    for text in texts:
+        m = _KENNZIFFER_RE.search(text or "")
+        if m:
+            return m.group(1).lower()
+    return None

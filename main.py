@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from config import validate_config, CHECK_INTERVAL_MINUTES
 from database import Database
 from notifier import Notifier
-from base_module import BaseModule, normalize_for_dedup
+from base_module import BaseModule, normalize_for_dedup, extract_kennziffer
 import modules
 
 def load_modules():
@@ -67,8 +67,13 @@ def run(loop=False):
                 print(f"Suche auf {module.name}... {label}")
 
                 for job in jobs:
-                    dedup_key = normalize_for_dedup(job['title'], job.get('location', ''))
-                    # Bekannt, wenn die Quellen-ID ODER (quellenübergreifend) der Titel schon existiert
+                    # Bevorzugt die Behörden-Kennziffer (z.B. AS-2026-072) als robusten
+                    # quellenübergreifenden Schlüssel, sonst den normalisierten Titel.
+                    dedup_key = (
+                        extract_kennziffer(job['title'], job['url'])
+                        or normalize_for_dedup(job['title'], job.get('location', ''))
+                    )
+                    # Bekannt, wenn die Quellen-ID ODER (quellenübergreifend) der Schlüssel existiert
                     if db.job_exists(job['id']) or db.dedup_key_exists(dedup_key):
                         continue
                     print(f"  -> Neuer Job: {job['title']}")
