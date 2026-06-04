@@ -2,6 +2,7 @@ import time
 import os
 import importlib
 import pkgutil
+from concurrent.futures import ThreadPoolExecutor
 from config import validate_config, CHECK_INTERVAL_MINUTES
 from database import Database
 from notifier import Notifier
@@ -21,6 +22,16 @@ def load_modules():
                 loaded_modules.append(attribute())
     return loaded_modules
 
+def fetch_module(module):
+    """Ruft die Jobs eines Moduls ab. Läuft pro Modul in einem eigenen Thread."""
+    start = time.time()
+    try:
+        jobs = module.fetch_jobs()
+        return module, jobs, time.time() - start, None
+    except Exception as e:
+        return module, [], time.time() - start, e
+
+
 def run(loop=False):
     if not validate_config():
         return
@@ -35,39 +46,48 @@ def run(loop=False):
 
     print(f"Robot gestartet mit {len(active_modules)} Modulen: {[m.name for m in active_modules]}")
 
-    while True:
-        start_run = time.time()
-        all_new_jobs = []
-        for module in active_modules:
-            print(f"Suche auf {module.name}...", end=" ", flush=True)
-            module_start = time.time()
-            try:
-                jobs = module.fetch_jobs()
-                duration = time.time() - module_start
-                print(f"erledigt ({len(jobs)} Jobs gefunden in {duration:.2f}s)")
-                
+    try:
+        while True:
+            start_run = time.time()
+            all_new_jobs = []
+
+            # Module parallel abfragen -> Gesamtdauer = langsamstes Modul statt Summe
+            with ThreadPoolExecutor(max_workers=len(active_modules)) as executor:
+                results = list(executor.map(fetch_module, active_modules))
+
+            # Ergebnisse in stabiler Reihenfolge verarbeiten (DB nur im Hauptthread)
+            for module, jobs, duration, error in results:
+                if error:
+                    print(f"Suche auf {module.name}... FEHLER nach {duration:.2f}s: {error}")
+                    continue
+
+                label = f"erledigt ({len(jobs)} Jobs gefunden in {duration:.2f}s)"
+                if not jobs:
+                    label += "  ⚠️  0 Jobs – evtl. Filter/Selektor prüfen"
+                print(f"Suche auf {module.name}... {label}")
+
                 for job in jobs:
                     if not db.job_exists(job['id']):
                         print(f"  -> Neuer Job: {job['title']}")
                         db.add_job(job['id'], module.name, job['title'], job['url'])
                         all_new_jobs.append((module.name, job))
-            except Exception as e:
-                print(f"FEHLER: {e}")
 
-        if all_new_jobs:
-            print(f"Sende {len(all_new_jobs)} neue Jobs an Telegram...")
-            notifier.notify_jobs_bundled(all_new_jobs)
-        else:
-            print("Keine neuen Jobs gefunden.")
+            if all_new_jobs:
+                print(f"Sende {len(all_new_jobs)} neue Jobs an Telegram...")
+                notifier.notify_jobs_bundled(all_new_jobs)
+            else:
+                print("Keine neuen Jobs gefunden.")
 
-        total_duration = time.time() - start_run
-        print(f"Durchlauf beendet. Gesamtdauer: {total_duration:.2f}s")
+            total_duration = time.time() - start_run
+            print(f"Durchlauf beendet. Gesamtdauer: {total_duration:.2f}s")
 
-        if not loop:
-            break
+            if not loop:
+                break
 
-        print(f"Warte {CHECK_INTERVAL_MINUTES} Minuten bis zur nächsten Suche...")
-        time.sleep(CHECK_INTERVAL_MINUTES * 60)
+            print(f"Warte {CHECK_INTERVAL_MINUTES} Minuten bis zur nächsten Suche...")
+            time.sleep(CHECK_INTERVAL_MINUTES * 60)
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     # Wenn wir auf GitHub Actions laufen, wollen wir nur einen Durchlauf
