@@ -3,6 +3,7 @@ import re
 import time
 import requests
 import feedparser
+from config import HTTP_TIMEOUT, HTTP_RETRIES
 
 DEFAULT_HEADERS = {
     'User-Agent': (
@@ -13,7 +14,7 @@ DEFAULT_HEADERS = {
 
 
 class BaseModule(ABC):
-    DEFAULT_TIMEOUT = 15
+    DEFAULT_TIMEOUT = HTTP_TIMEOUT
 
     def __init__(self):
         self._session = None
@@ -45,7 +46,7 @@ class BaseModule(ABC):
 
     # --- Gemeinsame Helfer für die Module ---
 
-    def get(self, url, retries=2, **kwargs):
+    def get(self, url, retries=HTTP_RETRIES, **kwargs):
         """
         GET-Request über die geteilte Session inkl. Timeout & raise_for_status.
         Bei transienten Netzwerkfehlern (Connection-Reset, Timeout) wird erneut versucht.

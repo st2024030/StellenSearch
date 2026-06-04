@@ -1,9 +1,17 @@
+import sys
 import time
 import os
 import importlib
 import pkgutil
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import validate_config, CHECK_INTERVAL_MINUTES
+
+# Auf GitHub Actions (kein TTY) wird stdout sonst gepuffert -> Logs erscheinen erst am
+# Ende und der Lauf wirkt wie eingefroren. Zeilenweises Flushen macht den Fortschritt sichtbar.
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+except (AttributeError, ValueError):
+    pass
 from database import Database
 from notifier import Notifier
 from base_module import BaseModule, normalize_for_dedup, extract_kennziffer
@@ -51,34 +59,37 @@ def run(loop=False):
             start_run = time.time()
             all_new_jobs = []
 
-            # Module parallel abfragen -> Gesamtdauer = langsamstes Modul statt Summe
+            print(f"Starte Suche auf {len(active_modules)} Portalen (parallel)...")
+
+            # Module parallel abfragen -> Gesamtdauer = langsamstes Modul statt Summe.
+            # Ergebnisse werden verarbeitet, sobald ein Modul fertig ist (Live-Fortschritt).
             with ThreadPoolExecutor(max_workers=len(active_modules)) as executor:
-                results = list(executor.map(fetch_module, active_modules))
+                futures = [executor.submit(fetch_module, m) for m in active_modules]
 
-            # Ergebnisse in stabiler Reihenfolge verarbeiten (DB nur im Hauptthread)
-            for module, jobs, duration, error in results:
-                if error:
-                    print(f"Suche auf {module.name}... FEHLER nach {duration:.2f}s: {error}")
-                    continue
-
-                label = f"erledigt ({len(jobs)} Jobs gefunden in {duration:.2f}s)"
-                if not jobs:
-                    label += "  [!] 0 Jobs - evtl. Filter/Selektor pruefen"
-                print(f"Suche auf {module.name}... {label}")
-
-                for job in jobs:
-                    # Bevorzugt die Behörden-Kennziffer (z.B. AS-2026-072) als robusten
-                    # quellenübergreifenden Schlüssel, sonst den normalisierten Titel.
-                    dedup_key = (
-                        extract_kennziffer(job['title'], job['url'])
-                        or normalize_for_dedup(job['title'], job.get('location', ''))
-                    )
-                    # Bekannt, wenn die Quellen-ID ODER (quellenübergreifend) der Schlüssel existiert
-                    if db.job_exists(job['id']) or db.dedup_key_exists(dedup_key):
+                for future in as_completed(futures):
+                    module, jobs, duration, error = future.result()
+                    if error:
+                        print(f"  {module.name}: FEHLER nach {duration:.2f}s: {error}")
                         continue
-                    print(f"  -> Neuer Job: {job['title']}")
-                    db.add_job(job['id'], module.name, job['title'], job['url'], dedup_key)
-                    all_new_jobs.append((module.name, job))
+
+                    label = f"{len(jobs)} Jobs in {duration:.2f}s"
+                    if not jobs:
+                        label += "  [!] 0 Jobs - evtl. Filter/Selektor pruefen"
+                    print(f"  {module.name}: {label}")
+
+                    for job in jobs:
+                        # Bevorzugt die Behörden-Kennziffer (z.B. AS-2026-072) als robusten
+                        # quellenübergreifenden Schlüssel, sonst den normalisierten Titel.
+                        dedup_key = (
+                            extract_kennziffer(job['title'], job['url'])
+                            or normalize_for_dedup(job['title'], job.get('location', ''))
+                        )
+                        # Bekannt, wenn Quellen-ID ODER (quellenübergreifend) der Schlüssel existiert
+                        if db.job_exists(job['id']) or db.dedup_key_exists(dedup_key):
+                            continue
+                        print(f"  -> Neuer Job: {job['title']}")
+                        db.add_job(job['id'], module.name, job['title'], job['url'], dedup_key)
+                        all_new_jobs.append((module.name, job))
 
             if all_new_jobs:
                 print(f"Sende {len(all_new_jobs)} neue Jobs an Telegram...")
