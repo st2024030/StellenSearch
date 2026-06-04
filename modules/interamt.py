@@ -39,25 +39,20 @@ class InteramtModule(BaseModule):
                     job_id = str(item.get("Id"))
                     kerndaten = item.get("Kerndaten", {})
                     title = kerndaten.get("Stellenbezeichnung", "Unbekannter Titel")
-                    
-                    # Filtering
-                    title_lower = title.lower()
-                    
+
                     # Ort extrahieren (Liste von EinsatzOrt Objekten)
                     einsatzorte = kerndaten.get("EinsatzOrt", [])
                     orte_str = " ".join([o.get("EinsatzOrt", "").lower() for o in einsatzorte])
-                    
-                    
-                    # Keyword Filter
-                    if INTERAMT_FILTER_KEYWORDS:
-                        if not any(kw in title_lower for kw in INTERAMT_FILTER_KEYWORDS):
-                            continue
-                    
-                    # Location Filter
-                    if INTERAMT_FILTER_LOCATION:
-                        if INTERAMT_FILTER_LOCATION not in orte_str:
-                            continue
-                    
+
+                    # Clientseitiger Filter (gemeinsamer Helfer aus BaseModule)
+                    if not self.matches_filters(
+                        title,
+                        location=orte_str,
+                        keywords=INTERAMT_FILTER_KEYWORDS or None,
+                        locations=[INTERAMT_FILTER_LOCATION] if INTERAMT_FILTER_LOCATION else None,
+                    ):
+                        continue
+
                     job_url = f"https://www.interamt.de/koop/app/stelle?id={job_id}"
                     
                     all_jobs.append({
