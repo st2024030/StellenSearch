@@ -1,6 +1,9 @@
-import feedparser
+from bs4 import BeautifulSoup
 from base_module import BaseModule
 import os
+
+BKA_BASE_URL = "https://www.karriere.bka.de/"
+
 
 class BKAModule(BaseModule):
     @property
@@ -13,36 +16,36 @@ class BKAModule(BaseModule):
             print("WARNUNG: BKA_SEARCH_URL nicht in .env definiert.")
             return []
 
-        # RSS View erzwingen
-        rss_url = url
-        if "view=renderRSS" not in rss_url:
-            if "?" in rss_url:
-                rss_url += "&view=renderRSS"
-            else:
-                rss_url += "?view=renderRSS"
-
-        # Optimierung: Erst mit requests holen (schnellerer Timeout & Handling)
+        # Hinweis: Der frühere RSS-Export (view=renderRSS) liefert nur noch HTML,
+        # daher parsen wir die Trefferliste direkt aus der Suchseite.
         try:
-            import requests
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-            response = requests.get(rss_url, timeout=10, headers=headers)
-            response.raise_for_status()
-            feed = feedparser.parse(response.content)
+            response = self.get(url)
         except Exception as e:
-            print(f"Fehler beim Laden des BKA-Feeds: {e}")
+            print(f"Fehler beim Laden der BKA-Seite: {e}")
             return []
 
+        soup = BeautifulSoup(response.text, 'html.parser')
         jobs = []
-        for entry in feed.entries:
-            # ID aus dem Link extrahieren (z.B. .../T-2026-31.html -> T-2026-31)
-            job_id = entry.link.split('/')[-1].replace('.html', '')
-            
+
+        # Jede Stelle steckt in einem Container '.c-joboffer' mit einem Detail-Link
+        for offer in soup.select('.c-joboffer'):
+            link = offer.select_one('a[href]')
+            if not link:
+                continue
+
+            href = link.get('href')
+            job_url = href if href.startswith('http') else BKA_BASE_URL + href.lstrip('/')
+
+            # ID aus dem Link extrahieren (z.B. .../T-2026-29.html -> T-2026-29)
+            job_id = href.split('/')[-1].replace('.html', '')
+
+            headline = offer.select_one('.c-joboffer__headline') or link
+            title = " ".join(headline.get_text().split())
+
             jobs.append({
                 'id': job_id,
-                'title': entry.title,
-                'url': entry.link
+                'title': title,
+                'url': job_url
             })
-        
+
         return jobs

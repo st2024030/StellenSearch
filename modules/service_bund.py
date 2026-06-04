@@ -1,6 +1,6 @@
-import feedparser
 from base_module import BaseModule
 from config import SERVICE_BUND_SEARCH_URL
+
 
 class ServiceBundModule(BaseModule):
     @property
@@ -12,27 +12,12 @@ class ServiceBundModule(BaseModule):
             print("WARNUNG: SERVICE_BUND_SEARCH_URL nicht in .env definiert.")
             return []
 
-        # Sicherstellen, dass RSS aktiviert ist
-        rss_url = SERVICE_BUND_SEARCH_URL
-        if "jobsrss=true" not in rss_url:
-            if "?" in rss_url:
-                rss_url += "&jobsrss=true"
-            else:
-                rss_url += "?jobsrss=true"
+        # RSS aktivieren und genug Ergebnisse anfordern
+        rss_url = self.append_param(SERVICE_BUND_SEARCH_URL, "jobsrss=true")
+        rss_url = self.append_param(rss_url, "resultsPerPage=100")
 
-        # Sicherstellen, dass wir genug Ergebnisse bekommen
-        if "resultsPerPage=" not in rss_url:
-             rss_url += "&resultsPerPage=100"
-
-        # Optimierung: Erst mit requests holen
         try:
-            import requests
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-            response = requests.get(rss_url, timeout=10, headers=headers)
-            response.raise_for_status()
-            feed = feedparser.parse(response.content)
+            feed = self.fetch_rss(rss_url)
         except Exception as e:
             print(f"Fehler beim Laden des ServiceBund-Feeds: {e}")
             return []
@@ -44,5 +29,5 @@ class ServiceBundModule(BaseModule):
                 'title': entry.title,
                 'url': entry.link
             })
-        
+
         return jobs
