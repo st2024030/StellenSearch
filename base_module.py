@@ -28,17 +28,11 @@ class BaseModule(ABC):
 
     @property
     def session(self):
-        """Wiederverwendbare HTTP-Session (Connection-Reuse) mit Cloudscraper für WAF Bypass."""
+        """Wiederverwendbare HTTP-Session (Connection-Reuse) mit curl_cffi für perfekten WAF Bypass."""
         if self._session is None:
             try:
-                import cloudscraper
-                self._session = cloudscraper.create_scraper(
-                    browser={
-                        'browser': 'chrome',
-                        'platform': 'windows',
-                        'mobile': False
-                    }
-                )
+                from curl_cffi import requests as cffi_requests
+                self._session = cffi_requests.Session(impersonate="chrome")
             except ImportError:
                 self._session = requests.Session()
             
@@ -73,17 +67,19 @@ class BaseModule(ABC):
         for attempt in range(retries + 1):
             try:
                 response = self.session.get(url, **kwargs)
-                response.raise_for_status()
+                if hasattr(response, "raise_for_status"):
+                    response.raise_for_status()
                 return response
-            except requests.exceptions.HTTPError as e:
-                print(f"[DEBUG] HTTP Error {e.response.status_code} for {url}")
-                print(f"[DEBUG] Headers: {e.response.headers}")
-                print(f"[DEBUG] Body (500 chars): {e.response.text[:500]}")
-                if attempt >= retries:
-                    raise
-                time.sleep(1.5 * (attempt + 1))
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-                print(f"[DEBUG] Network Error for {url} on attempt {attempt+1}: {e}")
+            except Exception as e:
+                name = type(e).__name__
+                if "HTTPError" in name and hasattr(e, "response") and e.response is not None:
+                    print(f"[DEBUG] HTTP Error {e.response.status_code} for {url}")
+                    print(f"[DEBUG] Headers: {e.response.headers}")
+                    text = getattr(e.response, "text", "")
+                    print(f"[DEBUG] Body (500 chars): {text[:500]}")
+                else:
+                    print(f"[DEBUG] Network/Timeout Error for {url} on attempt {attempt+1}: {name} - {e}")
+                
                 if attempt >= retries:
                     raise
                 time.sleep(1.5 * (attempt + 1))
