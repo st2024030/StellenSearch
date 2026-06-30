@@ -75,7 +75,15 @@ class BaseModule(ABC):
                 response = self.session.get(url, **kwargs)
                 response.raise_for_status()
                 return response
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            except requests.exceptions.HTTPError as e:
+                print(f"[DEBUG] HTTP Error {e.response.status_code} for {url}")
+                print(f"[DEBUG] Headers: {e.response.headers}")
+                print(f"[DEBUG] Body (500 chars): {e.response.text[:500]}")
+                if attempt >= retries:
+                    raise
+                time.sleep(1.5 * (attempt + 1))
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                print(f"[DEBUG] Network Error for {url} on attempt {attempt+1}: {e}")
                 if attempt >= retries:
                     raise
                 time.sleep(1.5 * (attempt + 1))
