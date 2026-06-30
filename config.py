@@ -10,8 +10,8 @@ CHECK_INTERVAL_MINUTES = int(os.getenv("CHECK_INTERVAL_MINUTES", "60"))
 
 # HTTP-Verhalten der Module. Auf gedrosselten Umgebungen (z.B. GitHub-Runner-IPs)
 # können einzelne .bund.de-Portale langsam sein -> Timeout/Retries hier justierbar.
-HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "15"))
-HTTP_RETRIES = int(os.getenv("HTTP_RETRIES", "2"))
+HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "30"))
+HTTP_RETRIES = int(os.getenv("HTTP_RETRIES", "3"))
 SERVICE_BUND_SEARCH_URL = os.getenv("SERVICE_BUND_SEARCH_URL")
 BUNDESPOLIZEI_SEARCH_URL = os.getenv("BUNDESPOLIZEI_SEARCH_URL")
 BKA_SEARCH_URL = os.getenv("BKA_SEARCH_URL")
