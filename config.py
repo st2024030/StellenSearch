@@ -21,21 +21,6 @@ INTERAMT_API_KEYS = [k.strip() for k in os.getenv("INTERAMT_API_KEYS", "").split
 INTERAMT_BASE_URL = os.getenv("INTERAMT_BASE_URL", "https://gate.interamt.de/interamtApi/v1/api")
 
 
-def _csv(name, default=""):
-    return [v.strip().lower() for v in os.getenv(name, default).split(",") if v.strip()]
-
-
-# Generische clientseitige Filter (für Quellen ohne serverseitigen Laufbahn-/Ort-Filter)
-FILTER_HD_KEYWORDS = _csv(
-    "FILTER_HD_KEYWORDS",
-    "höherer dienst,a13,a14,a15,e13,e14,e15,master,referent,referatsleit,wissenschaftlich",
-)
-FILTER_LOCATION_KEYWORDS = _csv("FILTER_LOCATION_KEYWORDS", "berlin")
-
-# Strenger "höherer Dienst"-Filter: standardmäßig aus, da Bund+IT+Berlin bereits stark
-# vorfiltert und viele HD-Stellen die Keywords nicht im Titel tragen (Recall vor Precision).
-STRICT_HD_FILTER = os.getenv("STRICT_HD_FILTER", "false").lower() == "true"
-
 # Bundesagentur für Arbeit (Jobsuche-API)
 ARBEITSAGENTUR_UMKREIS = int(os.getenv("ARBEITSAGENTUR_UMKREIS", "0"))
 ARBEITSAGENTUR_NUR_OEFFENTLICH = os.getenv("ARBEITSAGENTUR_NUR_OEFFENTLICH", "true").lower() == "true"
