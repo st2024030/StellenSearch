@@ -28,9 +28,20 @@ class BaseModule(ABC):
 
     @property
     def session(self):
-        """Wiederverwendbare HTTP-Session (Connection-Reuse) mit Standard-Headern."""
+        """Wiederverwendbare HTTP-Session (Connection-Reuse) mit Cloudscraper für WAF Bypass."""
         if self._session is None:
-            self._session = requests.Session()
+            try:
+                import cloudscraper
+                self._session = cloudscraper.create_scraper(
+                    browser={
+                        'browser': 'chrome',
+                        'platform': 'windows',
+                        'mobile': False
+                    }
+                )
+            except ImportError:
+                self._session = requests.Session()
+            
             self._session.headers.update(DEFAULT_HEADERS)
         return self._session
 
