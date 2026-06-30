@@ -1,10 +1,7 @@
 from base_module import BaseModule
 from config import INTERAMT_API_KEYS, INTERAMT_BASE_URL
 
-# Neue Konfiguration für Filter (optional)
-import os
-INTERAMT_FILTER_KEYWORDS = [k.strip().lower() for k in os.getenv("INTERAMT_FILTER_KEYWORDS", "").split(",") if k.strip()]
-INTERAMT_FILTER_LOCATION = os.getenv("INTERAMT_FILTER_LOCATION", "").strip().lower()
+# Keine generischen Wortfilter mehr, Daten werden direkt geprüft
 
 class InteramtModule(BaseModule):
     @property
@@ -44,13 +41,18 @@ class InteramtModule(BaseModule):
                     einsatzorte = kerndaten.get("EinsatzOrt", [])
                     orte_str = " ".join([o.get("EinsatzOrt", "").lower() for o in einsatzorte])
 
-                    # Clientseitiger Filter (gemeinsamer Helfer aus BaseModule)
-                    if not self.matches_filters(
-                        title,
-                        location=orte_str,
-                        keywords=INTERAMT_FILTER_KEYWORDS or None,
-                        locations=[INTERAMT_FILTER_LOCATION] if INTERAMT_FILTER_LOCATION else None,
-                    ):
+                    # Nativer Datenfilter: Einsatzorte prüfen
+                    if "berlin" not in orte_str:
+                        continue
+
+                    # Nativer Datenfilter: Höherer Dienst über Laufbahn/Eingruppierung prüfen
+                    laufbahn = kerndaten.get("Laufbahn", "").lower()
+                    eingruppierung = kerndaten.get("Eingruppierung", "").lower()
+                    
+                    is_hd = ("höher" in laufbahn or
+                             any(g in eingruppierung for g in ["13", "14", "15", "16", "b2", "b3", "a13", "e13", "a14", "e14", "a15", "e15"]))
+                    
+                    if not is_hd:
                         continue
 
                     job_url = f"https://www.interamt.de/koop/app/stelle?id={job_id}"

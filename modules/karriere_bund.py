@@ -1,10 +1,8 @@
 from bs4 import BeautifulSoup
 from base_module import BaseModule
-from config import STRICT_HD_FILTER, FILTER_HD_KEYWORDS
 
 BASE_URL = "https://karriere.bund.de"
 SEARCH_URL = "https://karriere.bund.de/arbeiten-bei-uns/stellenangebote-bei-uns"
-
 
 class KarriereBundModule(BaseModule):
     @property
@@ -12,10 +10,11 @@ class KarriereBundModule(BaseModule):
         return "karriere.bund.de"
 
     def fetch_jobs(self):
-        # Solr-Suche: Freitext Informatik, Bundesland Berlin, nur reguläre Stellen
+        # Solr-Suche: Freitext Informatik, Bundesland Berlin, Höherer Dienst, nur reguläre Stellen
         params = [
             ('tx_solr[q]', 'Informatik'),
             ('tx_solr[filter][]', 'state:Berlin'),
+            ('tx_solr[filter][]', 'careerLevel:Höherer Dienst'),
             ('tx_solr[filter][entryLevelOptions]', 'entryLevelOptions:work'),
         ]
 
@@ -48,9 +47,6 @@ class KarriereBundModule(BaseModule):
             for noise in ("Karte umdrehen", "jetzt lesen"):
                 text = text.replace(noise, "")
             title = text.strip() or " ".join(link.get_text().split())
-
-            if STRICT_HD_FILTER and not self.matches_filters(title, keywords=FILTER_HD_KEYWORDS):
-                continue
 
             jobs.append({
                 'id': job_id,

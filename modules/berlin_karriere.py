@@ -1,16 +1,11 @@
 from bs4 import BeautifulSoup
 from base_module import BaseModule
-from config import STRICT_HD_FILTER, FILTER_HD_KEYWORDS
 
 BASE_URL = "https://www.karriereportal-stellen.berlin.de"
 SEARCH_URL = "https://www.karriereportal-stellen.berlin.de/stellenangebote.html"
 
 # Tätigkeitsfeld "IT-Berufe" (serverseitiger Filter des rexx-Portals)
 IT_AUFGABENGEBIET_ID = "59"
-
-# Praktika/Ausbildung sind kein höherer Dienst -> ausschließen
-EXCLUDE_KEYWORDS = ("praktikum", "ausbildung", "studierende", "werkstudent", "trainee")
-
 
 class BerlinKarriereModule(BaseModule):
     @property
@@ -25,6 +20,9 @@ class BerlinKarriereModule(BaseModule):
         for page in range(5):
             params = [
                 ('filter[aufgabengebiet_id][]', IT_AUFGABENGEBIET_ID),
+                ('filter[taetigkeit_id][]', '32'), # Mit Masterabschluss
+                ('filter[taetigkeit_id][]', '33'), # Mit 2. juristischen Staatsexamen
+                ('filter[taetigkeit_id][]', '35'), # Trainee (Master)
                 ('start', str(page * 20)),
             ]
             try:
@@ -56,12 +54,6 @@ class BerlinKarriereModule(BaseModule):
                 bezeichnung = " ".join(link.get_text().split()) or (cells[0] if cells else "")
                 behoerde = cells[1] if len(cells) > 1 else ""
                 title = f"{bezeichnung} – {behoerde}" if behoerde else bezeichnung
-
-                low = bezeichnung.lower()
-                if any(x in low for x in EXCLUDE_KEYWORDS):
-                    continue
-                if STRICT_HD_FILTER and not self.matches_filters(title, keywords=FILTER_HD_KEYWORDS):
-                    continue
 
                 jobs.append({
                     'id': job_id,

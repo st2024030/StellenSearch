@@ -1,7 +1,6 @@
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from base_module import BaseModule
-from config import FILTER_LOCATION_KEYWORDS
 
 BASE_URL = "https://www.bnd.bund.de"
 SEARCH_URL = "https://www.bnd.bund.de/SiteGlobals/Forms/Suche/erweiterte_Karrieresuche_Formular.html"
@@ -46,10 +45,20 @@ class BNDModule(BaseModule):
             # Bubbles tragen Ort, Berufsfeld und Qualifikation -> für die Filterung nutzen
             bubbles = " ".join(b.get_text(" ", strip=True) for b in link.select('.c-bubble'))
 
-            # Standort Berlin UND IT-Bezug verlangen (clientseitig, da kein Server-Filter)
-            if not self.matches_filters(
-                f"{title} {bubbles}", keywords=IT_KEYWORDS, locations=FILTER_LOCATION_KEYWORDS
-            ):
+            # Standort Berlin, IT-Bezug UND Höherer Dienst verlangen (über die strukturieren Bubbles)
+            bubbles_low = bubbles.lower()
+            
+            # 1. Ort
+            if "berlin" not in bubbles_low:
+                continue
+                
+            # 2. IT-Bezug
+            if not any(kw in bubbles_low for kw in IT_KEYWORDS):
+                continue
+                
+            # 3. Höherer Dienst
+            # Da BND oft "Höherer Dienst" in den Bubbles stehen hat
+            if "höher" not in bubbles_low and "master" not in bubbles_low:
                 continue
 
             job_url = urljoin(BASE_URL + '/', href).split('?')[0]

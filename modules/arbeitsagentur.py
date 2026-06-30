@@ -2,7 +2,6 @@ from base_module import BaseModule
 from config import (
     ARBEITSAGENTUR_UMKREIS,
     ARBEITSAGENTUR_NUR_OEFFENTLICH,
-    FILTER_LOCATION_KEYWORDS,
 )
 
 API_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs"
@@ -55,9 +54,19 @@ class ArbeitsagenturModule(BaseModule):
             lokationen = item.get("stellenlokationen", [])
             ort = lokationen[0].get("adresse", {}).get("ort", "") if lokationen else ""
 
-            # Standortfilter (API liefert i.d.R. nur Berlin, hier zur Sicherheit)
-            if not self.matches_filters(title, f"{firma} {ort}", locations=FILTER_LOCATION_KEYWORDS):
+            # Standortfilter (Datenfilter über API/Feld)
+            if "berlin" not in ort.lower():
                 continue
+
+            # Nativer Datenfilter: Höherer Dienst über Vergütungsangabe prüfen (falls vorhanden)
+            verguetung = item.get("verguetungsangabe", "").lower()
+            # Falls Vergütung angegeben ist, prüfe ob es HD ist. Falls nicht angegeben,
+            # können wir es bei der BA oft nicht sicher filtern, lassen es aber zu
+            # oder filtern es streng. Da der User strenge Datenfilter will:
+            if verguetung:
+                is_hd = any(g in verguetung for g in ["13", "14", "15", "16", "a 13", "e 13", "e13", "a13"])
+                if not is_hd:
+                    continue
 
             # Öffentlicher-Dienst-Filter (Bund-Priorität)
             if ARBEITSAGENTUR_NUR_OEFFENTLICH and not any(
